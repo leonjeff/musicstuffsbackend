@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sc query postgresql*)",
+      "Bash(sc query \"postgresql\")",
+      "Bash(sc queryex type=service state=all)",
+      "Bash(netstat -ano)",
+      "Bash(PGPASSWORD=\"jhYj4hUYJBpK6Q3f2Khk\" psql -U postgres -c \"CREATE DATABASE music_stuffs;\")",
+      "Bash(PGPASSWORD=\"jhYj4hUYJBpK6Q3f2Khk\" \"/c/Program Files/PostgreSQL/18/bin/psql.exe\" -U postgres -c \"CREATE DATABASE music_stuffs;\")",
+      "Read(//c/Users/jeffj/.claude/projects/c--Users-jeffj-Desktop-Proyectos-MS-music-stuffs-backend/memory/**)"
+    ]
+  }
+}
