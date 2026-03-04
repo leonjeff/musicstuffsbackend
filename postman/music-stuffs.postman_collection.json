@@ -162,6 +162,41 @@
       "description": "Endpoints JSON para subir y consultar videos.\n\nLos paths devueltos son relativos a VIDEO_BASE_DIR.\nEl frontend construye las URLs estáticas como {{mediaUrl}}/{path}.\n\nEl campo durationMs es la duración con precisión de milisegundos,\nútil para loop sample-accurate y sincronización audio/video.",
       "item": [
         {
+          "name": "List videos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/videos",
+              "host": ["{{baseUrl}}"],
+              "path": ["videos"]
+            },
+            "description": "Requiere rol teacher o admin.\n- Teacher: devuelve solo sus propios videos (filtrado por createdBy).\n- Admin: devuelve todos los videos.\nOrdenados por fecha de creación descendente."
+          },
+          "response": [
+            {
+              "name": "200 – Lista de videos",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"4042ee35-60b6-4e8a-8dc6-e21a86436298\",\n    \"status\": \"ready\",\n    \"originalFilename\": \"clase-guitarra.mp4\",\n    \"durationMs\": 225340,\n    \"resolution\": \"1920x1080\",\n    \"thumbnailPath\": \"4042ee35-60b6-4e8a-8dc6-e21a86436298/thumbnail.jpg\",\n    \"createdAt\": \"2026-03-04T15:54:38.000Z\"\n  },\n  {\n    \"id\": \"95c19003-68b0-4fc1-8c48-aa145623fb6c\",\n    \"status\": \"failed\",\n    \"originalFilename\": \"YOYOKA 12th Birthday Session.mp4\",\n    \"durationMs\": null,\n    \"resolution\": null,\n    \"thumbnailPath\": null,\n    \"createdAt\": \"2026-03-04T14:30:00.000Z\"\n  }\n]"
+            },
+            {
+              "name": "200 – Lista vacía",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[]"
+            },
+            {
+              "name": "403 – Sin rol teacher/admin",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"No tienes permisos para esta acción\"\n}"
+            }
+          ]
+        },
+        {
           "name": "Upload video",
           "request": {
             "method": "POST",
@@ -500,9 +535,10 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"user-uuid-001\",\n  \"startTime\": 42.5,\n  \"endTime\": 78.0,\n  \"label\": \"Puente de la canción\",\n  \"isPublic\": false,\n  \"isRecommended\": false\n}",
+              "raw": "{\n  \"startTime\": 42.5,\n  \"endTime\": 78.0,\n  \"label\": \"Puente de la canción\",\n  \"isPublic\": false,\n  \"isRecommended\": false\n}",
               "options": { "raw": { "language": "json" } }
-            }
+            },
+            "description": "El userId no se envía en el body. Se obtiene automáticamente desde el JWT autenticado."
           },
           "response": [
             {
