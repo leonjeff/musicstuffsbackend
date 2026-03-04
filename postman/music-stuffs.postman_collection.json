@@ -2,7 +2,17 @@
   "info": {
     "name": "Music Stuffs API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "API REST para la plataforma educativa de música.\n\nDos tipos de acceso:\n  - {{baseUrl}}  → endpoints JSON (subir, consultar estado, loops, variantes, cursos)\n  - {{mediaUrl}} → archivos estáticos (HLS, audio, waveform, thumbnail, metadata)\n\nCORS permitido — headers extra requeridos para streaming:\n  - Range (range requests de audio/video)\n  - Content-Range, Accept-Ranges, Content-Length (expuestos al frontend)\n\nFlujo principal:\n  1. POST /videos/upload → { id }\n  2. GET  /videos/:id/status (polling hasta status=ready)\n  3. Reproducir HLS desde {{mediaUrl}}/{{videoId}}/index.m3u8\n  4. Cargar WAV desde GET /videos/:id/audio (para pitch/transpose en frontend)\n  5. Cargar waveform desde GET /videos/:id/waveform\n\nFlujo de cursos (teacher):\n  1. POST /teacher/courses → crear curso\n  2. POST /teacher/courses/:courseId/modules → crear módulos\n  3. POST /teacher/courses/:courseId/modules/:moduleId/lessons → crear lecciones\n     - preview:true → lección pública sin necesidad de matrícula\n     - duration → duración en segundos\n  4. POST /teacher/lessons/:lessonId/resources → adjuntar recursos"
+    "description": "API REST para la plataforma educativa de música.\n\nAutenticación:\n  Todos los endpoints (excepto GET /) requieren JWT Bearer token.\n  Obtén un access_token de Auth0 y pégalo en la variable {{token}} de la colección.\n\nDos tipos de acceso:\n  - {{baseUrl}}  → endpoints JSON (subir, consultar estado, loops, variantes, cursos)\n  - {{mediaUrl}} → archivos estáticos (HLS, audio, waveform, thumbnail, metadata)\n\nCORS permitido — headers extra requeridos para streaming:\n  - Range (range requests de audio/video)\n  - Content-Range, Accept-Ranges, Content-Length (expuestos al frontend)\n\nFlujo principal:\n  1. POST /videos/upload → { id }\n  2. GET  /videos/:id/status (polling hasta status=ready)\n  3. Reproducir HLS desde {{mediaUrl}}/{{videoId}}/index.m3u8\n  4. Cargar WAV desde GET /videos/:id/audio (para pitch/transpose en frontend)\n  5. Cargar waveform desde GET /videos/:id/waveform\n\nFlujo de cursos (teacher):\n  1. POST /teacher/courses → crear curso\n  2. POST /teacher/courses/:courseId/modules → crear módulos\n  3. POST /teacher/courses/:courseId/modules/:moduleId/lessons → crear lecciones\n     - preview:true → lección pública sin necesidad de matrícula\n     - duration → duración en segundos\n  4. POST /teacher/lessons/:lessonId/resources → adjuntar recursos"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
   },
   "variable": [
     {
@@ -16,6 +26,12 @@
       "value": "http://localhost:3001/media",
       "type": "string",
       "description": "Archivos estáticos servidos directamente por Express"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "Access token de Auth0 — pegar aquí el JWT obtenido desde el frontend o Auth0 dashboard"
     },
     {
       "key": "videoId",
@@ -58,9 +74,89 @@
       "value": "",
       "type": "string",
       "description": "UUID de un recurso — copiar del response de Create resource"
+    },
+    {
+      "key": "auth0UserId",
+      "value": "",
+      "type": "string",
+      "description": "ID de usuario Auth0 (ej: auth0|abc123) - copiar del response de Create user"
+    },
+    {
+      "key": "roleId",
+      "value": "",
+      "type": "string",
+      "description": "ID de un rol en Auth0 - copiar del response de Create role"
+    },
+    {
+      "key": "permissionName",
+      "value": "",
+      "type": "string",
+      "description": "Nombre del permiso/scope - copiar del response de Create permission"
+    },
+    {
+      "key": "connection",
+      "value": "Username-Password-Authentication",
+      "type": "string",
+      "description": "Nombre de la connection de Auth0 para crear usuarios administrados"
     }
   ],
   "item": [
+    {
+      "name": "0 · Auth",
+      "description": "Endpoints de autenticación.\n\nPara obtener un token de prueba:\n  1. Ve a Auth0 Dashboard → Applications → APIs → tu API → Test\n  2. Copia el access_token y pégalo en la variable {{token}} de la colección.\n\nO desde tu frontend: usa auth0-react / auth0-spa-js y copia el token del resultado de getAccessTokenSilently().",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Endpoint público — no requiere token."
+          },
+          "response": [
+            {
+              "name": "200 – OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "text/plain" }],
+              "body": "Hello World!"
+            }
+          ]
+        },
+        {
+          "name": "Get current user (me)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Devuelve los datos del usuario autenticado extraídos del JWT.\nÚtil para verificar que el token es válido y ver los roles asignados."
+          },
+          "response": [
+            {
+              "name": "200 – Usuario autenticado",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"auth0|64a1b2c3d4e5f6a7b8c9d0e1\",\n  \"email\": \"teacher@example.com\",\n  \"roles\": [\"teacher\"],\n  \"permissions\": [\n    \"courses:read\",\n    \"courses:write\",\n    \"lessons:read\",\n    \"lessons:write\",\n    \"videos:read\",\n    \"videos:write\",\n    \"analytics:read\"\n  ],\n  \"redirectTo\": \"/teacher/dashboard\"\n}"
+            },
+            {
+              "name": "401 – Token inválido o ausente",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"statusCode\": 401,\n  \"message\": \"Unauthorized\"\n}"
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "1 · Videos — API",
       "description": "Endpoints JSON para subir y consultar videos.\n\nLos paths devueltos son relativos a VIDEO_BASE_DIR.\nEl frontend construye las URLs estáticas como {{mediaUrl}}/{path}.\n\nEl campo durationMs es la duración con precisión de milisegundos,\nútil para loop sample-accurate y sincronización audio/video.",
@@ -70,14 +166,6 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/videos/upload",
-            "header": [
-              {
-                "key": "x-teacher-id",
-                "value": "teacher-uuid-001",
-                "description": "Opcional — ID del docente",
-                "disabled": true
-              }
-            ],
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -88,7 +176,8 @@
                   "description": ".mp4 | .mov | .mkv — máx 500 MB"
                 }
               ]
-            }
+            },
+            "description": "Requiere rol teacher o admin.\nEl teacherId se obtiene automáticamente del JWT (sub claim)."
           },
           "response": [
             {
@@ -111,6 +200,13 @@
               "code": 400,
               "header": [{ "key": "Content-Type", "value": "application/json" }],
               "body": "{\n  \"statusCode\": 400,\n  \"message\": \"Archivo demasiado grande: 600.0 MB (máximo: 500 MB)\"\n}"
+            },
+            {
+              "name": "403 – Sin rol teacher/admin",
+              "status": "Forbidden",
+              "code": 403,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"statusCode\": 403,\n  \"message\": \"No tienes permisos para esta acción\"\n}"
             }
           ]
         },
@@ -276,6 +372,7 @@
         {
           "name": "HLS – index.m3u8",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/index.m3u8"
           },
@@ -292,6 +389,7 @@
         {
           "name": "HLS – segment_000.ts",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/segment_000.ts"
           },
@@ -308,6 +406,7 @@
         {
           "name": "Audio WAV (estático directo)",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/audio.wav",
             "description": "Alternativa estática a GET /videos/:id/audio.\nMisma respuesta — PCM 16-bit 44.1 kHz estéreo."
@@ -325,6 +424,7 @@
         {
           "name": "Waveform JSON (video ≤ 1h)",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/waveform.json"
           },
@@ -333,6 +433,7 @@
         {
           "name": "Waveform high-res JSON (video > 1h)",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/waveform-high.json"
           },
@@ -341,6 +442,7 @@
         {
           "name": "Waveform low-res JSON (video > 1h)",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/waveform-low.json"
           },
@@ -349,6 +451,7 @@
         {
           "name": "Metadata JSON",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/metadata.json"
           },
@@ -365,6 +468,7 @@
         {
           "name": "Thumbnail",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/thumbnail.jpg"
           },
@@ -627,6 +731,7 @@
         {
           "name": "Stream variant WAV – estático (alternativa)",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{mediaUrl}}/{{videoId}}/processed/pitch+2.wav"
           },
@@ -644,7 +749,7 @@
     },
     {
       "name": "5 · Teacher — My Courses",
-      "description": "CRUD completo de cursos, módulos, lecciones y recursos para docentes.\n\nTodos los endpoints requieren el header x-teacher-id.\nEl ownership se verifica en cada operación — 403 si el teacher no es dueño del recurso.\n\nJerarquía:\n  Course\n    └── Module  (position-ordered)\n          └── Lesson  (position-ordered, campos específicos de guitarra)\n                └── LessonResource  (PDF | TAB | BACKING_TRACK)\n\nEnums:\n  level:    BEGINNER | INTERMEDIATE | ADVANCED\n  category: ACOUSTIC | ELECTRIC | FINGERSTYLE | THEORY | OTHER\n  status:   DRAFT | PUBLISHED\n  type:     PDF | TAB | BACKING_TRACK\n\nSoft-delete: DELETE /teacher/courses/:courseId marca el curso como eliminado\n(deletedAt) sin borrar físicamente. Los módulos/lecciones/recursos se eliminan\nfísicamente con CASCADE en la BD.",
+      "description": "CRUD completo de cursos, módulos, lecciones y recursos para docentes.\n\nTodos los endpoints requieren JWT con rol teacher o admin.\nEl teacherId se extrae automáticamente del JWT (sub claim) — ya no se usa x-teacher-id.\nEl ownership se verifica en cada operación — 403 si el teacher no es dueño del recurso.\n\nJerarquía:\n  Course\n    └── Module  (position-ordered)\n          └── Lesson  (position-ordered, campos específicos de guitarra)\n                └── LessonResource  (PDF | TAB | BACKING_TRACK)\n\nEnums:\n  level:    BEGINNER | INTERMEDIATE | ADVANCED\n  category: ACOUSTIC | ELECTRIC | FINGERSTYLE | THEORY | OTHER\n  status:   DRAFT | PUBLISHED\n  type:     PDF | TAB | BACKING_TRACK\n\nSoft-delete: DELETE /teacher/courses/:courseId marca el curso como eliminado\n(deletedAt) sin borrar físicamente. Los módulos/lecciones/recursos se eliminan\nfísicamente con CASCADE en la BD.",
       "item": [
         {
           "name": "Courses",
@@ -659,8 +764,7 @@
                   "path": ["teacher", "courses"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -674,7 +778,7 @@
                   "status": "Created",
                   "code": 201,
                   "header": [{ "key": "Content-Type", "value": "application/json" }],
-                  "body": "{\n  \"id\": \"c1d2e3f4-0000-0000-0000-000000000001\",\n  \"teacherId\": \"teacher-uuid-001\",\n  \"title\": \"Guitarra Acústica para Principiantes\",\n  \"description\": \"Aprende los acordes básicos y técnicas fundamentales.\",\n  \"level\": \"BEGINNER\",\n  \"category\": \"ACOUSTIC\",\n  \"status\": \"DRAFT\",\n  \"thumbnailUrl\": null,\n  \"createdAt\": \"2026-02-25T10:00:00.000Z\",\n  \"updatedAt\": \"2026-02-25T10:00:00.000Z\",\n  \"deletedAt\": null\n}"
+                  "body": "{\n  \"id\": \"c1d2e3f4-0000-0000-0000-000000000001\",\n  \"teacherId\": \"auth0|64a1b2c3d4e5f6a7b8c9d0e1\",\n  \"title\": \"Guitarra Acústica para Principiantes\",\n  \"description\": \"Aprende los acordes básicos y técnicas fundamentales.\",\n  \"level\": \"BEGINNER\",\n  \"category\": \"ACOUSTIC\",\n  \"status\": \"DRAFT\",\n  \"thumbnailUrl\": null,\n  \"createdAt\": \"2026-02-25T10:00:00.000Z\",\n  \"updatedAt\": \"2026-02-25T10:00:00.000Z\",\n  \"deletedAt\": null\n}"
                 },
                 {
                   "name": "400 – Validación fallida",
@@ -682,6 +786,13 @@
                   "code": 400,
                   "header": [{ "key": "Content-Type", "value": "application/json" }],
                   "body": "{\n  \"statusCode\": 400,\n  \"message\": [\"level must be one of the following values: BEGINNER, INTERMEDIATE, ADVANCED\"]\n}"
+                },
+                {
+                  "name": "403 – Sin rol teacher/admin",
+                  "status": "Forbidden",
+                  "code": 403,
+                  "header": [{ "key": "Content-Type", "value": "application/json" }],
+                  "body": "{\n  \"statusCode\": 403,\n  \"message\": \"No tienes permisos para esta acción\"\n}"
                 }
               ]
             },
@@ -694,10 +805,7 @@
                   "host": ["{{baseUrl}}"],
                   "path": ["teacher", "courses"]
                 },
-                "header": [
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
-                ],
-                "description": "Devuelve cursos del teacher con sus módulos (sin lecciones ni recursos).\nOrdenados por createdAt DESC, módulos por position ASC."
+                "description": "Devuelve cursos del teacher con sus módulos (sin lecciones ni recursos).\nOrdenados por createdAt DESC, módulos por position ASC.\nEl teacherId se extrae del JWT."
               },
               "response": [
                 {
@@ -705,7 +813,7 @@
                   "status": "OK",
                   "code": 200,
                   "header": [{ "key": "Content-Type", "value": "application/json" }],
-                  "body": "[\n  {\n    \"id\": \"c1d2e3f4-0000-0000-0000-000000000001\",\n    \"teacherId\": \"teacher-uuid-001\",\n    \"title\": \"Guitarra Acústica para Principiantes\",\n    \"description\": \"Aprende los acordes básicos y técnicas fundamentales.\",\n    \"level\": \"BEGINNER\",\n    \"category\": \"ACOUSTIC\",\n    \"status\": \"DRAFT\",\n    \"thumbnailUrl\": null,\n    \"modules\": [],\n    \"createdAt\": \"2026-02-25T10:00:00.000Z\",\n    \"updatedAt\": \"2026-02-25T10:00:00.000Z\",\n    \"deletedAt\": null\n  }\n]"
+                  "body": "[\n  {\n    \"id\": \"c1d2e3f4-0000-0000-0000-000000000001\",\n    \"teacherId\": \"auth0|64a1b2c3d4e5f6a7b8c9d0e1\",\n    \"title\": \"Guitarra Acústica para Principiantes\",\n    \"description\": \"Aprende los acordes básicos y técnicas fundamentales.\",\n    \"level\": \"BEGINNER\",\n    \"category\": \"ACOUSTIC\",\n    \"status\": \"DRAFT\",\n    \"thumbnailUrl\": null,\n    \"modules\": [],\n    \"createdAt\": \"2026-02-25T10:00:00.000Z\",\n    \"updatedAt\": \"2026-02-25T10:00:00.000Z\",\n    \"deletedAt\": null\n  }\n]"
                 }
               ]
             },
@@ -718,9 +826,6 @@
                   "host": ["{{baseUrl}}"],
                   "path": ["teacher", "courses", "{{courseId}}"]
                 },
-                "header": [
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
-                ],
                 "description": "Devuelve el curso completo con módulos → lecciones → recursos.\nTodo ordenado por position ASC."
               },
               "response": [
@@ -729,7 +834,7 @@
                   "status": "OK",
                   "code": 200,
                   "header": [{ "key": "Content-Type", "value": "application/json" }],
-                  "body": "{\n  \"id\": \"c1d2e3f4-0000-0000-0000-000000000001\",\n  \"teacherId\": \"teacher-uuid-001\",\n  \"title\": \"Guitarra Acústica para Principiantes\",\n  \"level\": \"BEGINNER\",\n  \"category\": \"ACOUSTIC\",\n  \"status\": \"DRAFT\",\n  \"modules\": [\n    {\n      \"id\": \"m1000000-0000-0000-0000-000000000001\",\n      \"title\": \"Módulo 1 — Acordes básicos\",\n      \"position\": 0,\n      \"lessons\": [\n        {\n          \"id\": \"l1000000-0000-0000-0000-000000000001\",\n          \"title\": \"Do mayor\",\n          \"position\": 0,\n          \"bpm\": 60,\n          \"difficulty\": 2,\n          \"tuning\": \"EADGBE\",\n          \"key\": \"C major\",\n          \"timeSignature\": \"4/4\",\n          \"videoId\": \"4042ee35-60b6-4e8a-8dc6-e21a86436298\",\n          \"resources\": [\n            {\n              \"id\": \"r1000000-0000-0000-0000-000000000001\",\n              \"type\": \"TAB\",\n              \"title\": \"Tablatura Do mayor\",\n              \"url\": \"https://cdn.example.com/tabs/do-mayor.pdf\",\n              \"position\": 0\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}"
+                  "body": "{\n  \"id\": \"c1d2e3f4-0000-0000-0000-000000000001\",\n  \"teacherId\": \"auth0|64a1b2c3d4e5f6a7b8c9d0e1\",\n  \"title\": \"Guitarra Acústica para Principiantes\",\n  \"level\": \"BEGINNER\",\n  \"category\": \"ACOUSTIC\",\n  \"status\": \"DRAFT\",\n  \"modules\": [\n    {\n      \"id\": \"m1000000-0000-0000-0000-000000000001\",\n      \"title\": \"Módulo 1 — Acordes básicos\",\n      \"position\": 0,\n      \"lessons\": [\n        {\n          \"id\": \"l1000000-0000-0000-0000-000000000001\",\n          \"title\": \"Do mayor\",\n          \"position\": 0,\n          \"bpm\": 60,\n          \"difficulty\": 2,\n          \"tuning\": \"EADGBE\",\n          \"key\": \"C major\",\n          \"timeSignature\": \"4/4\",\n          \"videoId\": \"4042ee35-60b6-4e8a-8dc6-e21a86436298\",\n          \"resources\": [\n            {\n              \"id\": \"r1000000-0000-0000-0000-000000000001\",\n              \"type\": \"TAB\",\n              \"title\": \"Tablatura Do mayor\",\n              \"url\": \"https://cdn.example.com/tabs/do-mayor.pdf\",\n              \"position\": 0\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}"
                 },
                 {
                   "name": "403 – No es tu curso",
@@ -757,8 +862,7 @@
                   "path": ["teacher", "courses", "{{courseId}}"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -785,9 +889,6 @@
                   "host": ["{{baseUrl}}"],
                   "path": ["teacher", "courses", "{{courseId}}"]
                 },
-                "header": [
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
-                ],
                 "description": "Soft delete — establece deletedAt. El curso desaparece de List my courses.\nLos datos no se borran de la BD."
               },
               "response": [
@@ -815,8 +916,7 @@
                   "path": ["teacher", "courses", "{{courseId}}", "modules"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -842,10 +942,7 @@
                   "raw": "{{baseUrl}}/teacher/courses/{{courseId}}/modules",
                   "host": ["{{baseUrl}}"],
                   "path": ["teacher", "courses", "{{courseId}}", "modules"]
-                },
-                "header": [
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
-                ]
+                }
               },
               "response": [
                 {
@@ -867,8 +964,7 @@
                   "path": ["teacher", "courses", "{{courseId}}", "modules", "reorder"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -897,8 +993,7 @@
                   "path": ["teacher", "courses", "{{courseId}}", "modules", "{{moduleId}}"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -925,9 +1020,6 @@
                   "host": ["{{baseUrl}}"],
                   "path": ["teacher", "courses", "{{courseId}}", "modules", "{{moduleId}}"]
                 },
-                "header": [
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
-                ],
                 "description": "Hard delete con CASCADE — elimina también lecciones y recursos del módulo."
               },
               "response": [
@@ -955,8 +1047,7 @@
                   "path": ["teacher", "courses", "{{courseId}}", "modules", "{{moduleId}}", "lessons"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -984,8 +1075,7 @@
                   "path": ["teacher", "courses", "{{courseId}}", "modules", "{{moduleId}}", "lessons", "reorder"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -1013,8 +1103,7 @@
                   "path": ["teacher", "courses", "{{courseId}}", "modules", "{{moduleId}}", "lessons", "{{lessonId}}"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -1041,9 +1130,6 @@
                   "host": ["{{baseUrl}}"],
                   "path": ["teacher", "courses", "{{courseId}}", "modules", "{{moduleId}}", "lessons", "{{lessonId}}"]
                 },
-                "header": [
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
-                ],
                 "description": "Hard delete con CASCADE — elimina también los recursos de la lección."
               },
               "response": [
@@ -1071,15 +1157,14 @@
                   "path": ["teacher", "lessons", "{{lessonId}}", "resources"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"type\": \"TAB\",\n  \"title\": \"Tablatura Do mayor\",\n  \"url\": \"https://cdn.example.com/tabs/do-mayor.pdf\"\n}",
                   "options": { "raw": { "language": "json" } }
                 },
-                "description": "Tipos disponibles: PDF | TAB | BACKING_TRACK\n\nOwnership verificado via JOIN lesson → module → course → teacherId."
+                "description": "Tipos disponibles: PDF | TAB | BACKING_TRACK\n\nOwnership verificado via JOIN lesson → module → course → teacherId (del JWT)."
               },
               "response": [
                 {
@@ -1101,8 +1186,7 @@
                   "path": ["teacher", "lessons", "{{lessonId}}", "resources"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -1122,8 +1206,7 @@
                   "path": ["teacher", "lessons", "{{lessonId}}", "resources"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -1143,8 +1226,7 @@
                   "path": ["teacher", "lessons", "{{lessonId}}", "resources", "reorder"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -1172,8 +1254,7 @@
                   "path": ["teacher", "lessons", "{{lessonId}}", "resources", "{{resourceId}}"]
                 },
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
+                  { "key": "Content-Type", "value": "application/json" }
                 ],
                 "body": {
                   "mode": "raw",
@@ -1199,10 +1280,7 @@
                   "raw": "{{baseUrl}}/teacher/lessons/{{lessonId}}/resources/{{resourceId}}",
                   "host": ["{{baseUrl}}"],
                   "path": ["teacher", "lessons", "{{lessonId}}", "resources", "{{resourceId}}"]
-                },
-                "header": [
-                  { "key": "x-teacher-id", "value": "teacher-uuid-001" }
-                ]
+                }
               },
               "response": [
                 {
@@ -1213,6 +1291,240 @@
                   "body": ""
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 - Admin - Auth0 RBAC",
+      "description": "Provisioning/admin para Auth0 Management API.\n\nTodos los endpoints requieren rol admin.\nSi DEV_BYPASS_ADMIN=true en development y no se envia Authorization, el backend puede permitir acceso por bypass solo para estas rutas.\n\nRBAC Core asumido:\n  - Roles = Authorization Core roles\n  - Permisos = scopes del API (Resource Server)\n  - Para incluir permisos en access token, habilita RBAC + Add Permissions in the Access Token en Auth0\n  - Si quieres roles en el token, agrega un Action que escriba el claim namespaced configurado en AUTH0_ROLES_CLAIM",
+      "item": [
+        {
+          "name": "Create user",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin-created@example.com\",\n  \"connection\": \"{{connection}}\",\n  \"password\": \"ChangeMe123!\",\n  \"name\": \"Admin Created User\",\n  \"roleIds\": []\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Crea usuario en Auth0 via Management API y sincroniza UserProfile local.\nSi la connection admite social login o passwordless, password puede omitirse."
+          },
+          "response": [
+            {
+              "name": "201 - Usuario creado",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"user\": {\n    \"auth0UserId\": \"auth0|65f0abc1234567890def1234\",\n    \"email\": \"admin-created@example.com\",\n    \"name\": \"Admin Created User\",\n    \"emailVerified\": false,\n    \"blocked\": false,\n    \"loginsCount\": 0,\n    \"lastLogin\": null,\n    \"auth0CreatedAt\": \"2026-03-03T18:00:00.000Z\",\n    \"roles\": [],\n    \"profileId\": \"8adf17c4-20f3-4f61-bd45-3e62f306f311\",\n    \"profileUpdatedAt\": \"2026-03-03T18:00:00.000Z\"\n  },\n  \"profile\": {\n    \"id\": \"8adf17c4-20f3-4f61-bd45-3e62f306f311\",\n    \"auth0UserId\": \"auth0|65f0abc1234567890def1234\",\n    \"email\": \"admin-created@example.com\",\n    \"name\": \"Admin Created User\",\n    \"rolesCache\": [],\n    \"createdAt\": \"2026-03-03T18:00:00.000Z\",\n    \"updatedAt\": \"2026-03-03T18:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/users?page=0&perPage=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "admin",
+                  "description": "Busqueda opcional por email o name",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "perPage",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Lista usuarios de Auth0 con paginacion e incluye roles cacheados desde UserProfile local si existen."
+          },
+          "response": [
+            {
+              "name": "200 - Lista de usuarios",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"page\": 0,\n  \"perPage\": 20,\n  \"total\": 1,\n  \"users\": [\n    {\n      \"auth0UserId\": \"auth0|65f0abc1234567890def1234\",\n      \"email\": \"admin-created@example.com\",\n      \"name\": \"Admin Created User\",\n      \"emailVerified\": false,\n      \"blocked\": false,\n      \"loginsCount\": 0,\n      \"lastLogin\": null,\n      \"auth0CreatedAt\": \"2026-03-03T18:00:00.000Z\",\n      \"roles\": [\"admin\"],\n      \"profileId\": \"8adf17c4-20f3-4f61-bd45-3e62f306f311\",\n      \"profileUpdatedAt\": \"2026-03-03T18:05:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Assign roles to user",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{auth0UserId}}/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{auth0UserId}}", "roles"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roleIds\": [\n    \"{{roleId}}\"\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Asigna uno o mas roles a un usuario de Auth0 y actualiza el cache local."
+          },
+          "response": [
+            {
+              "name": "201 - Roles asignados",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"auth0UserId\": \"auth0|65f0abc1234567890def1234\",\n  \"roles\": [\n    {\n      \"id\": \"rol_abc123\",\n      \"name\": \"admin\",\n      \"description\": \"Acceso administrativo completo\"\n    }\n  ],\n  \"profile\": {\n    \"id\": \"8adf17c4-20f3-4f61-bd45-3e62f306f311\",\n    \"auth0UserId\": \"auth0|65f0abc1234567890def1234\",\n    \"email\": \"admin-created@example.com\",\n    \"name\": \"Admin Created User\",\n    \"rolesCache\": [\"admin\"],\n    \"createdAt\": \"2026-03-03T18:00:00.000Z\",\n    \"updatedAt\": \"2026-03-03T18:05:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create role",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"content-manager\",\n  \"description\": \"Gestiona cursos, usuarios y configuracion de contenido\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "201 - Rol creado",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"rol_abc123\",\n  \"name\": \"content-manager\",\n  \"description\": \"Gestiona cursos, usuarios y configuracion de contenido\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List roles",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 - Lista de roles",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"rol_abc123\",\n    \"name\": \"admin\",\n    \"description\": \"Acceso administrativo completo\"\n  },\n  {\n    \"id\": \"rol_def456\",\n    \"name\": \"teacher\",\n    \"description\": \"Puede administrar cursos y recursos\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Assign permissions to role",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/admin/roles/{{roleId}}/permissions",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "roles", "{{roleId}}", "permissions"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissionNames\": [\n    \"{{permissionName}}\"\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Asigna scopes del Resource Server configurado en AUTH0_API_IDENTIFIER al rol indicado."
+          },
+          "response": [
+            {
+              "name": "201 - Permisos asignados al rol",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"roleId\": \"rol_abc123\",\n  \"permissions\": [\n    {\n      \"permissionName\": \"admin:users:create\",\n      \"description\": \"Crear usuarios desde panel admin\",\n      \"resourceServerIdentifier\": \"https://api.music-stuffs.com\",\n      \"resourceServerName\": \"Music Stuffs API\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create permission",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/admin/permissions",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "permissions"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"admin:users:create\",\n  \"description\": \"Crear usuarios desde panel admin\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Intenta agregar un scope al Resource Server de Auth0. Si el tenant/plan no lo permite, el backend responde 501 con instruccion de usar Dashboard."
+          },
+          "response": [
+            {
+              "name": "201 - Permiso creado",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"created\": true,\n  \"permission\": {\n    \"value\": \"admin:users:create\",\n    \"description\": \"Crear usuarios desde panel admin\"\n  }\n}"
+            },
+            {
+              "name": "501 - Tenant no soporta creacion por API",
+              "status": "Not Implemented",
+              "code": 501,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"statusCode\": 501,\n  \"message\": \"Este tenant no permite crear scopes por Management API. Configuralos en Auth0 Dashboard y usa GET /admin/permissions para sincronizar.\",\n  \"error\": \"Not Implemented\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List permissions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/admin/permissions",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "permissions"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 - Lista de permisos",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"apiIdentifier\": \"https://api.music-stuffs.com\",\n  \"resourceServerId\": \"67c1234abcde890f12345678\",\n  \"resourceServerName\": \"Music Stuffs API\",\n  \"permissions\": [\n    {\n      \"value\": \"admin:users:create\",\n      \"description\": \"Crear usuarios desde panel admin\"\n    },\n    {\n      \"value\": \"admin:roles:assign\",\n      \"description\": \"Asignar roles y permisos\"\n    }\n  ]\n}"
             }
           ]
         }
