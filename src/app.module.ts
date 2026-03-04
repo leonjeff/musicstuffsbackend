@@ -3,6 +3,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { AuthAdminModule } from './auth-admin/auth-admin.module';
+import { UserProfile } from './auth-admin/entities/user-profile.entity';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -58,6 +60,7 @@ import { Student } from './students/entities/student.entity';
           LessonProgress,
           CourseProgress,
           LastLessonViewed,
+          UserProfile,
         ],
         synchronize: true,
       }),
@@ -66,6 +69,7 @@ import { Student } from './students/entities/student.entity';
     LoopModule,
     AudioVariantModule,
     CoursesModule,
+    AuthAdminModule,
   ],
   controllers: [AppController],
   providers: [
