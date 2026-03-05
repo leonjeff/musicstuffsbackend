@@ -1,6 +1,6 @@
-FROM node:20-bookworm-slim
+FROM node:20-bookworm-slim AS base
 
-# Instalar ffmpeg y audiowaveform con todas sus dependencias runtime
+# Instala binarios multimedia requeridos en runtime.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     wget \
@@ -17,17 +17,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get purge -y --auto-remove wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Verificar instalación — el build falla si audiowaveform no está disponible
-RUN audiowaveform --version
+RUN ffprobe -version && audiowaveform --version
 
+FROM base AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 COPY . .
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
+
+FROM base AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package*.json ./
 
 EXPOSE 3001
-
 CMD ["node", "dist/main"]
