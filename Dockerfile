@@ -4,11 +4,11 @@ FROM node:20-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     wget \
-    && wget -q https://github.com/bbc/audiowaveform/releases/download/1.10.1/audiowaveform_1.10.1-1-12_amd64.deb \
-    && apt-get install -y --no-install-recommends ./audiowaveform_1.10.1-1-12_amd64.deb \
-    && rm audiowaveform_1.10.1-1-12_amd64.deb \
-    && apt-get remove -y wget \
-    && apt-get autoremove -y \
+    ca-certificates \
+    && wget -q "https://github.com/bbc/audiowaveform/releases/download/1.10.1/audiowaveform_1.10.1-1-bookworm_amd64.deb" -O /tmp/aw.deb \
+    && apt-get install -y --no-install-recommends /tmp/aw.deb \
+    && rm /tmp/aw.deb \
+    && apt-get purge -y --auto-remove wget \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
